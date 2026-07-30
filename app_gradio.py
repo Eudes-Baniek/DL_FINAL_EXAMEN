@@ -67,34 +67,39 @@ def process_audio(audio_path):
         return "Aucun fichier audio fourni.", ""
 
     try:
-        # 1. Envoi de l'audio à l'Inference API HF pour transcription
-        
         with open(audio_path, "rb") as f:
             audio_bytes = f.read()
         
+        # 1. ASR via HF Inference API
         asr_response = client.automatic_speech_recognition(
             audio_bytes, 
             model=ASR_MODEL
         )
-        transcription = asr_response.get("text", "")
+        
+        # Extraction sécurisée du texte
+        if isinstance(asr_response, dict):
+            transcription = asr_response.get("text", "")
+        else:
+            transcription = str(asr_response)
 
         if not transcription.strip():
-            return "Transcription vide ou audio silencieux.", "N/A"
+            return "Transcription vide ou audio inaudible.", "N/A"
 
-        # 2. Envoi du texte à l'API HF pour l'analyse de sentiment
-        
+        # 2. Sentiment via HF Inference API
         sentiment_response = client.text_classification(
             transcription, 
             model=SENTIMENT_MODEL
         )
         
-        # Formattage des résultats
-        
         results = [f"{item.get('label', 'Inconnu')}: {item.get('score', 0.0):.2%}" for item in sentiment_response]
         return transcription, "\n".join(results)
 
     except Exception as e:
-        return f"Erreur lors du traitement : {str(e)}", "Erreur"
+        # Affiche le détail complet de l'erreur
+        error_details = f"Détail de l'erreur : {type(e).__name__} - {repr(e)}"
+        print("--- TRACEBACK ---")
+        traceback.print_exc()
+        return error_details, "Erreur"
 
 demo = gr.Interface(
     fn=process_audio,
