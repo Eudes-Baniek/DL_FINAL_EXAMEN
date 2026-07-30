@@ -51,10 +51,10 @@ import requests
 import gradio as gr
 
 # Token HF depuis Render
-render-deploy = os.getenv("render-deploy")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 # En-têtes pour les requêtes HTTP directes
-HEADERS = {"Authorization": f"Bearer {render-deploy}"}
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 # Endpoints Inference API
 ASR_URL = "https://router.huggingface.co/hf-inference/models/jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -64,8 +64,8 @@ def process_audio(audio_path):
     if not audio_path:
         return "Aucun fichier audio fourni.", "N/A"
 
-    if not render-deploy:
-        return "ERREUR : La variable d'environnement render-deploy n'est pas définie sur Render !", "Erreur Token"
+    if not HF_TOKEN:
+        return "ERREUR : La variable d'environnement HF_TOKEN n'est pas définie sur Render !", "Erreur Token"
 
     try:
         # 1. Lecture de l'audio
