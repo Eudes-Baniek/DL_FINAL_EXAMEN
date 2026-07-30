@@ -5,8 +5,6 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-ENV HF_TOKEN="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"
-
 # II. Installation de FFmpeg et des bibliothèques système nécessaires pour l'audio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
