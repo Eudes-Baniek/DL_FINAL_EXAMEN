@@ -46,61 +46,79 @@
 #     demo.launch()
 
 
-
 import os
+import requests
 import gradio as gr
-from huggingface_hub import InferenceClient
 
-# Jeton récupéré depuis les variables d'environnement de Render
-
+# Token HF depuis Render
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Initialisation du client d'inférence très léger
+# En-têtes pour les requêtes HTTP directes
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-client = InferenceClient(token=HF_TOKEN)
-
-ASR_MODEL = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
-SENTIMENT_MODEL = "cmarkea/distilcamembert-base-sentiment"
+# Endpoints Inference API
+ASR_URL = "https://api-inference.huggingface.co/models/jonatasgrosman/wav2vec2-large-xlsr-53-french"
+SENTIMENT_URL = "https://api-inference.huggingface.co/models/cmarkea/distilcamembert-base-sentiment"
 
 def process_audio(audio_path):
     if not audio_path:
-        return "Aucun fichier audio fourni.", ""
+        return "Aucun fichier audio fourni.", "N/A"
+
+    if not HF_TOKEN:
+        return "ERREUR : La variable d'environnement HF_TOKEN n'est pas définie sur Render !", "Erreur Token"
 
     try:
+        # 1. Lecture de l'audio
         with open(audio_path, "rb") as f:
-            audio_bytes = f.read()
+            data = f.read()
+
+        # 2. Appel API ASR (Transcription)
+        response_asr = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
         
-        # 1. ASR via HF Inference API
-        asr_response = client.automatic_speech_recognition(
-            audio_bytes, 
-            model=ASR_MODEL
-        )
+        if response_asr.status_code == 503:
+            return "Le modèle Wav2Vec2 est en cours de chargement sur Hugging Face (503). Patientez 20 secondes et réessayez.", "Modèle en chauffe"
         
-        # Extraction sécurisée du texte
-        if isinstance(asr_response, dict):
-            transcription = asr_response.get("text", "")
+        if response_asr.status_code != 200:
+            return f"Erreur API ASR (Code {response_asr.status_code}) : {response_asr.text}", "Erreur ASR"
+
+        result_asr = response_asr.json()
+        
+        # Extraction du texte transcrit
+        if isinstance(result_asr, dict):
+            transcription = result_asr.get("text", "")
+        elif isinstance(result_asr, list) and len(result_asr) > 0:
+            transcription = result_asr[0].get("text", "")
         else:
-            transcription = str(asr_response)
+            transcription = str(result_asr)
 
         if not transcription.strip():
-            return "Transcription vide ou audio inaudible.", "N/A"
+            return "Transcription vide ou audio inaudible.", "Neutre"
 
-        # 2. Sentiment via HF Inference API
-        sentiment_response = client.text_classification(
-            transcription, 
-            model=SENTIMENT_MODEL
-        )
-        
-        results = [f"{item.get('label', 'Inconnu')}: {item.get('score', 0.0):.2%}" for item in sentiment_response]
-        return transcription, "\n".join(results)
+        # 3. Appel API Sentiment
+        payload_sentiment = {"inputs": transcription}
+        response_sent = requests.post(SENTIMENT_URL, headers=HEADERS, json=payload_sentiment, timeout=20)
 
+        if response_sent.status_code != 200:
+            return transcription, f"Erreur API Sentiment (Code {response_sent.status_code}) : {response_sent.text}"
+
+        result_sent = response_sent.json()
+
+        # Formatage des scores de sentiment
+        if isinstance(result_sent, list) and len(result_sent) > 0:
+            predictions = result_sent[0] if isinstance(result_sent[0], list) else result_sent
+            formatted = [f"{item.get('label', 'Inconnu')}: {item.get('score', 0.0):.2%}" for item in predictions]
+            sentiment_text = "\n".join(formatted)
+        else:
+            sentiment_text = str(result_sent)
+
+        return transcription, sentiment_text
+
+    except requests.exceptions.Timeout:
+        return "Erreur : Temps d'attente dépassé (Timeout API Hugging Face). Réessayez.", "Timeout"
     except Exception as e:
-        # Affiche le détail complet de l'erreur
-        error_details = f"Détail de l'erreur : {type(e).__name__} - {repr(e)}"
-        print("--- TRACEBACK ---")
-        traceback.print_exc()
-        return error_details, "Erreur"
+        return f"Erreur système : {str(e)}", "Erreur"
 
+# Interface Gradio
 demo = gr.Interface(
     fn=process_audio,
     inputs=gr.Audio(type="filepath", label="Fichier audio (.wav / .mp3)"),
@@ -109,7 +127,7 @@ demo = gr.Interface(
         gr.Textbox(label="Sentiment (CamemBERT)")
     ],
     title="Détection de Sentiment dans les Appels Vocaux",
-    description="Pipeline ASR -> NLP déployé via Hugging Face Inference API"
+    description="Pipeline ASR -> NLP via Hugging Face Inference API"
 )
 
 if __name__ == "__main__":
