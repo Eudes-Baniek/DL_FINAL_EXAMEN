@@ -11,8 +11,8 @@ app = FastAPI(
 
 # Configuration de l'Inference Client Hugging Face
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-client = InferenceClient(token=HF_TOKEN)
+render-deploy = os.getenv("render-deploy")
+client = InferenceClient(token=render-deploy)
 
 ASR_MODEL = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
 SENTIMENT_MODEL = "cmarkea/distilcamembert-base-sentiment"
