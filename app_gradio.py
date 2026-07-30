@@ -57,8 +57,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 # Endpoints Inference API
-ASR_URL = "https://api-inference.huggingface.co/models/jonatasgrosman/wav2vec2-large-xlsr-53-french"
-SENTIMENT_URL = "https://api-inference.huggingface.co/models/cmarkea/distilcamembert-base-sentiment"
+ASR_URL = "https://router.huggingface.co/hf-inference/models/jonatasgrosman/wav2vec2-large-xlsr-53-french"
+SENTIMENT_URL = "https://router.huggingface.co/hf-inference/models/cmarkea/distilcamembert-base-sentiment"
 
 def process_audio(audio_path):
     if not audio_path:
