@@ -3,11 +3,12 @@ from transformers import pipeline
 class SentimentModel:
     def __init__(self):
         print("Chargement du modèle Sentiment CamemBERT...")
-        # Modèle local Hugging Face
+        # I. Modèle local Hugging Face
         self.classifier = pipeline(
             "text-classification",
             model="cmarkea/distilcamembert-base-sentiment",
-            top_k=None  # Récupère tous les scores
+            # Récupère tous les scores
+            top_k=None  
         )
 
     def _map_label(self, raw_label: str) -> str:
@@ -26,7 +27,9 @@ class SentimentModel:
 
         try:
             results = self.classifier(text)[0]
-            # Extraction dynamique du score max
+            
+            # II. Extraction dynamique du score max
+            
             top_pred = max(results, key=lambda x: x["score"])
             
             return {

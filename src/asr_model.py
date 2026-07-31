@@ -18,17 +18,18 @@ class ASRModel:
             raise RuntimeError(f"Fichier audio introuvable : {audio_path}")
 
         try:
-            # 1. Chargement et rééchantillonnage à 16kHz avec librosa
+            # I. Chargement et rééchantillonnage à 16kHz avec librosa
             speech, sr = librosa.load(audio_path, sr=16000)
 
-            # 2. Prétraitement des valeurs d'entrée
+            # II. Prétraitement des valeurs d'entrée
             input_values = self.processor(speech, sampling_rate=sr, return_tensors="pt").input_values
 
-            # 3. Inférence (sans calcul de gradient)
+            # III. Inférence (sans calcul de gradient)
+            
             with torch.no_grad():
                 logits = self.model(input_values).logits
 
-            # 4. Décodage des argmax (prédiction des tokens)
+            # IV. Décodage des argmax (prédiction des tokens)
             predicted_ids = torch.argmax(logits, dim=-1)
             transcription = self.processor.batch_decode(predicted_ids)[0]
 

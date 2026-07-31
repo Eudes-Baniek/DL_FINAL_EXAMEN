@@ -11,10 +11,12 @@ class AudioSentimentPipeline:
     def predict(self, audio_path: str) -> dict:
         processed_path = None
         try:
-            # 1. Prétraitement (16kHz, mono)
+            # I. Prétraitement (16kHz, mono)
+            
             processed_path = preprocess_audio(audio_path)
 
-            # 2. Transcription ASR
+            # II. Transcription ASR
+            
             transcription = self.asr.transcribe(processed_path)
 
             if not transcription:
@@ -24,7 +26,8 @@ class AudioSentimentPipeline:
                     "confidence": 0.0
                 }
 
-            # 3. Sentiment NLP (CamemBERT)
+            # IV. Sentiment NLP (CamemBERT)
+            
             sentiment_res = self.sentiment.predict(transcription)
 
             return {
@@ -35,5 +38,6 @@ class AudioSentimentPipeline:
 
         finally:
             # Nettoyage du fichier temporaire
+            
             if processed_path and os.path.exists(processed_path):
                 os.remove(processed_path)

@@ -2,7 +2,7 @@ import os
 import gradio as gr
 from src.pipeline import AudioSentimentPipeline
 
-# Initialisation du pipeline global
+# I. Initialisation du pipeline global
 pipeline = AudioSentimentPipeline()
 
 
@@ -21,7 +21,7 @@ def process_audio(audio_path):
     except Exception as e:
         return f"Erreur lors du traitement : {str(e)}", "", ""
 
-# Interface Gradio avec import de fichier & enregistrement micro
+# II. Interface Gradio avec import de fichier & enregistrement micro
 
 demo = gr.Interface(
     fn=process_audio,
@@ -44,8 +44,8 @@ demo = gr.Interface(
 )
 
 if __name__ == "__main__":
-# Render injecte la variable PORT dynamiquement
+# III. Render injecte la variable PORT dynamiquement
     port = int(os.environ.get("PORT", 7860))
     
-    # server_name="0.0.0.0" est INDISPENSABLE pour les conteneurs/Render
+    # IV. server_name="0.0.0.0" est INDISPENSABLE pour les conteneurs/Render
     demo.launch(server_name="0.0.0.0", server_port=port)

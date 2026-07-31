@@ -28,19 +28,19 @@ def read_root():
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_audio(file: UploadFile = File(...)):
-    # Vérification du format audio
+    # I. Vérification du format audio
     if not file.filename.lower().endswith(('.wav', '.mp3', '.m4a', '.ogg')):
         raise HTTPException(status_code=400, detail="Format audio non supporté. Utilisez .wav ou .mp3")
 
     try:
-        # Lecture des octets du fichier audio envoyé
+        # II. Lecture des octets du fichier audio envoyé
         
         audio_bytes = await file.read()
         
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Le fichier audio fourni est vide.")
 
-        # 1. ASR - Transcription via Wav2Vec 2.0
+        # III. ASR - Transcription via Wav2Vec 2.0
         
         asr_response = client.automatic_speech_recognition(
             audio_bytes,
@@ -55,14 +55,14 @@ async def predict_audio(file: UploadFile = File(...)):
                 score=0.0
             )
 
-        # 2. NLP - Analyse de sentiment via CamemBERT
+        # IV. NLP - Analyse de sentiment via CamemBERT
         
         sentiment_response = client.text_classification(
             transcription,
             model=SENTIMENT_MODEL
         )
 
-        # Extraction du meilleur sentiment et son score
+        # V. Extraction du meilleur sentiment et son score
         top_sentiment = max(sentiment_response, key=lambda x: x.get("score", 0.0))
         
         return PredictionResponse(

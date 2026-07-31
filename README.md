@@ -2,8 +2,7 @@
 
 Projet d'Examen — **Deep Learning 2 (2026)**  
 **Établissement :** DIT (Dakar Institute of Technology)  
-**Auteur :** Eudes Exaucé Baniek  
-**Déploiement en ligne :** https://dl-final-examen.onrender.com/
+**Auteur :** Eudes Exaucé Baniek
 
 ---
 
@@ -18,28 +17,21 @@ Dans le cadre des centres d'appels clients, l'analyse manuelle des enregistremen
 
 ## 2. Architecture & Workflow
 
-Audio (.wav / .mp3)
-│
-▼
-[ Pipeline ASR ] ──► Groq API (Whisper-Large-v3-Turbo)
-│
-▼
-Transcription Texte
-│
-▼
-[ Pipeline NLP ] ──► Hugging Face API (DistilCamemBERT)
-│
-▼
-Résultat Final : Sentiment (Positif/Neutre/Négatif) + Confiance (%)
+## Modèles Utilisés
 
-## 3. Choix des Modèles & Justification
+# ASR (Speech-to-Text) : jonatasgrosman/wav2vec2-large-xlsr-53-french
 
-| Tâche                    | Modèle / Solution                                                     | Justification du Choix                                                                                                                                                                         |
-| :----------------------- | :-------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ASR (Speech-to-Text)** | `openai/whisper-large-v3-turbo` (via Groq API)                        | Modèle état de l'art pour la reconnaissance vocale française. L'exécution via les LPU de Groq offre un temps de réponse sub-secondaire et résout la contrainte de mémoire RAM sur l'hébergeur. |
-| **Sentiment (NLP)**      | `cmarkea/distilcamembert-base-sentiment` (via Hugging Face Inference) | Modèle BERT compact spécifiquement entraîné et ajusté pour la classification de sentiment sur le français (CamemBERT).                                                                         |
+Analyse de Sentiment (NLP) : Modèle basé sur l'architecture CamemBERT affiné pour la classification de texte en français.
 
----
+Stack Technique
+
+Langage : Python 3.10
+
+Framework Web & UI : Gradio, FastAPI, Uvicorn
+
+Deep Learning & Audio : PyTorch (CPU), Transformers (Hugging Face), Librosa, SoundFile, Pydub
+
+Conteneurisation & CI/CD : Docker, Render Cloud Services
 
 ## 4. Structure du Dépôt
 
@@ -57,8 +49,6 @@ Résultat Final : Sentiment (Positif/Neutre/Négatif) + Confiance (%)
 └── Images                 #Quelques captures d'écran
             # Documentation du projet
 5. Installation & Lancement Local
-
-Clé API Groq (stockée dans HF_TOKEN:votre_cle_groq_ici)
 
 Étape 1 : Cloner le dépôt et installer les dépendances
 
@@ -80,5 +70,31 @@ docker build -t audio-analyse-sentiment-app .
 b. lancement du container
 
 docker run -p 7860:7860 audio-analyse-sentiment-app
+
+
+# Cette partie : Elle concerne le déploiement hors projet que j'ai eu à faire
+
+   NB: Etant confronté au problemes de Memoire (512Mo de RAM maxi sur Render ) sur Render pour le déploiement,
+   pour etre conformes aux instructions du projet, j'ai décidé de ne pas faire le délpoiement avec le modele
+   Wav2Vec2.0. Cependant, pour ma propre gouverne, j'après expérienté le déploiement en utilisant Groq (jeton)
+
+Audio (.wav / .mp3)
+│
+▼
+[ Pipeline ASR ] ──► Groq API (Whisper-Large-v3-Turbo)
+│
+▼
+Transcription Texte
+│
+▼
+[ Pipeline NLP ] ──► Hugging Face API (DistilCamemBERT)
+│
+▼
+Résultat Final : Sentiment (Positif/Neutre/Négatif) + Confiance (%)
+
+**Déploiement en ligne :** https://dl-final-examen.onrender.com/
+
+Pour garder les trace de ce que j'avais fait, j'ai laissé les captures d'écran qui atteste du déploiement fait
+avec le modele 'Whisper-Large-v3-Turbo' et qui a bien marché.
 
 ```
