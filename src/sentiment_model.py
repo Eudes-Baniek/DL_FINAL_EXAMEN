@@ -16,13 +16,12 @@ class SentimentModel:
         return "neutre"
 
     def predict(self, text: str) -> dict:
-        """Analyse le sentiment via l'API publique Hugging Face."""
+        """Analyse le sentiment via l'API publique Hugging Face et extrait le score exact."""
         if not text or not text.strip():
             return {"sentiment": "neutre", "confidence": 0.0}
 
         payload = {"inputs": text}
         try:
-            # Envoi anonyme sans envoyer la clé Groq à HF
             response = requests.post(SENTIMENT_URL, json=payload, timeout=20)
 
             if response.status_code != 200:
@@ -30,18 +29,28 @@ class SentimentModel:
                 return {"sentiment": "neutre", "confidence": 0.0}
 
             result = response.json()
+
+            # Extraction robuste des prédictions
+            predictions = []
             if isinstance(result, list) and len(result) > 0:
-                predictions = result[0] if isinstance(result[0], list) else result
+                if isinstance(result[0], list) and len(result[0]) > 0:
+                    predictions = result[0]
+                else:
+                    predictions = result
+
+            if predictions:
+                # Trouver la prédiction avec le meilleur score
                 top_pred = max(predictions, key=lambda x: x.get("score", 0.0))
                 
-                raw_label = top_pred.get("label", "")
+                raw_label = str(top_pred.get("label", ""))
                 score = float(top_pred.get("score", 0.0))
-                
+
                 return {
                     "sentiment": self._map_label(raw_label),
-                    "confidence": score
+                    "confidence": round(score, 4)  # Arrondi propre à 4 décimales
                 }
+
         except Exception as e:
-            print(f"[Erreur Sentiment] : {e}")
+            print(f"[Erreur Sentiment Exec] : {e}")
 
         return {"sentiment": "neutre", "confidence": 0.0}
