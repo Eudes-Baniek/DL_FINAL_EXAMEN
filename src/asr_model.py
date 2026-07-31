@@ -1,11 +1,11 @@
 import os
+import time
 from huggingface_hub import InferenceClient
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 class ASRModel:
     def __init__(self):
-        # Utilisation du client officiel Hugging Face avec le modèle Whisper
         self.client = InferenceClient(
             model="openai/whisper-small",
             token=HF_TOKEN
@@ -16,19 +16,25 @@ class ASRModel:
         if not audio_path or not os.path.exists(audio_path):
             return ""
 
-        try:
-            # Envoie le fichier audio directement au service de reconnaissance vocale
-            result = self.client.automatic_speech_recognition(audio_path)
-            
-            # Extraction du texte selon le format de retour
-            if isinstance(result, dict):
-                return result.get("text", "").strip()
-            elif hasattr(result, "text"):
-                return result.text.strip()
-            return str(result).strip()
+        # Tentatives avec gestion du démarrage à chaud du modèle HF
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = self.client.automatic_speech_recognition(audio_path)
+                
+                if isinstance(result, dict):
+                    return result.get("text", "").strip()
+                elif hasattr(result, "text"):
+                    return result.text.strip()
+                return str(result).strip()
 
-        except Exception as e:
-            raise RuntimeError(f"Erreur ASR (InferenceClient) : {str(e)}")
+            except Exception as e:
+                err_msg = str(e)
+                # Si le modèle est en train de charger sur les serveurs HF
+                if "loading" in err_msg.lower() and attempt < max_retries - 1:
+                    time.sleep(10)
+                    continue
+                raise RuntimeError(f"Erreur ASR (InferenceClient) : {err_msg}")
 
         # Décodage des IDs en texte
         #le son est découpé en des petites briques qui sont transformés par des logits.
