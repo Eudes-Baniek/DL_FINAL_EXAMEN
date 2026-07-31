@@ -6,18 +6,16 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 class ASRModel:
     def __init__(self):
-        # Utilisation de l'API d'Inference HF
         self.client = InferenceClient(
             model="openai/whisper-small",
             token=HF_TOKEN
         )
 
     def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via l'InferenceClient d'Hugging Face."""
+        """Transcrit l'audio via l'InferenceClient d'Hugging Face en gérant le flux/générateur."""
         if not audio_path or not os.path.exists(audio_path):
             raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
 
-        # Lecture du fichier audio en binaire pour transmission directe
         try:
             with open(audio_path, "rb") as f:
                 audio_bytes = f.read()
@@ -29,18 +27,34 @@ class ASRModel:
 
         for attempt in range(max_retries):
             try:
-                # Passage des octets bruts directement à la méthode
-                result = self.client.automatic_speech_recognition(audio_bytes)
+                # Appels de reconnaissance vocale via le client HF
+                response = self.client.automatic_speech_recognition(audio_bytes)
                 
-                if isinstance(result, dict):
-                    return result.get("text", "").strip()
-                elif hasattr(result, "text"):
-                    return result.text.strip()
-                return str(result).strip()
+                # 1. Si response est un générateur / iterateur (cause du StopIteration)
+                if hasattr(response, "__iter__") and not isinstance(response, (dict, str, list)):
+                    full_text = []
+                    for chunk in response:
+                        if isinstance(chunk, dict):
+                            full_text.append(chunk.get("text", ""))
+                        elif hasattr(chunk, "text"):
+                            full_text.append(chunk.text)
+                        else:
+                            full_text.append(str(chunk))
+                    return "".join(full_text).strip()
+
+                # 2. Si response est un dictionnaire direct {"text": "..."}
+                if isinstance(response, dict):
+                    return response.get("text", "").strip()
+
+                # 3. Si response a un attribut .text
+                if hasattr(response, "text"):
+                    return response.text.strip()
+
+                return str(response).strip()
 
             except Exception as e:
+                # Évite d'attraper le StopIteration pour rien si c'était lié à une mauvaise itération
                 last_error = str(e) if str(e) else repr(e)
-                # Si le modèle est en cours de chargement sur HF
                 if "loading" in last_error.lower() and attempt < max_retries - 1:
                     time.sleep(10)
                     continue
