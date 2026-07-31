@@ -1,31 +1,34 @@
 import os
-import requests
+from huggingface_hub import InferenceClient
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-# ASR_URL = "https://router.huggingface.co/hf-inference/models/openai/whisper-small"
-ASR_URL = "https://api-inference.huggingface.co/models/openai/whisper-small"
 
 class ASRModel:
+    def __init__(self):
+        # Utilisation du client officiel Hugging Face avec le modèle Whisper
+        self.client = InferenceClient(
+            model="openai/whisper-small",
+            token=HF_TOKEN
+        )
+
     def transcribe(self, audio_path: str) -> str:
-        # Transcrit l'audio via l'API Inference de Hugging Face (Whisper)
+        """Transcrit l'audio via le client Inference officiel Hugging Face."""
         if not audio_path or not os.path.exists(audio_path):
             return ""
 
-        with open(audio_path, "rb") as f:
-            data = f.read()
+        try:
+            # Envoie le fichier audio directement au service de reconnaissance vocale
+            result = self.client.automatic_speech_recognition(audio_path)
+            
+            # Extraction du texte selon le format de retour
+            if isinstance(result, dict):
+                return result.get("text", "").strip()
+            elif hasattr(result, "text"):
+                return result.text.strip()
+            return str(result).strip()
 
-        response = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
-        
-        if response.status_code != 200:
-            raise RuntimeError(f"Erreur ASR (Code {response.status_code}) : {response.text}")
-
-        result = response.json()
-        if isinstance(result, dict):
-            return result.get("text", "").strip()
-        elif isinstance(result, list) and len(result) > 0:
-            return result[0].get("text", "").strip()
-        return str(result).strip()
+        except Exception as e:
+            raise RuntimeError(f"Erreur ASR (InferenceClient) : {str(e)}")
 
         # Décodage des IDs en texte
         #le son est découpé en des petites briques qui sont transformés par des logits.
