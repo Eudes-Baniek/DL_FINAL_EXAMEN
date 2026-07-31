@@ -1,5 +1,5 @@
 import os
-from src.preprocessing import preprocess_audio
+from src.audio_utils import preprocess_audio
 from src.asr_model import ASRModel
 from src.sentiment_model import SentimentModel
 

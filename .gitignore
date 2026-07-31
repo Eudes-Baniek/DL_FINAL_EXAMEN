@@ -6,15 +6,5 @@ __pycache__/
 *.wav
 *.mp3
 *.aac
-*.acc
-*.m4a
-*.flac
-*.ogg
-*.wma
-*.opus
-*.amr
-*.aiff
-*.webm
-
 .idea/
 .vscode/

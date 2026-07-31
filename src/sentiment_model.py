@@ -1,9 +1,15 @@
-import os
-import requests
-
-SENTIMENT_URL = "https://router.huggingface.co/hf-inference/models/cmarkea/distilcamembert-base-sentiment"
+from transformers import pipeline
 
 class SentimentModel:
+    def __init__(self):
+        print("Chargement du modèle Sentiment CamemBERT...")
+        # Modèle local Hugging Face
+        self.classifier = pipeline(
+            "text-classification",
+            model="cmarkea/distilcamembert-base-sentiment",
+            top_k=None  # Récupère tous les scores
+        )
+
     def _map_label(self, raw_label: str) -> str:
         label = raw_label.lower().strip()
         if "1 star" in label or "2 star" in label or "label_0" in label or "neg" in label:
@@ -18,27 +24,15 @@ class SentimentModel:
         if not text or not text.strip():
             return {"sentiment": "neutre", "confidence": 0.0}
 
-        payload = {"inputs": text}
         try:
-            # Envoi SANS header Authorization pour ne pas envoyer la cle Groq a HF
-            response = requests.post(SENTIMENT_URL, json=payload, timeout=10)
-
-            if response.status_code == 200:
-                result = response.json()
-                predictions = result[0] if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list) else result
-                
-                if isinstance(predictions, list) and len(predictions) > 0:
-                    top_pred = max(predictions, key=lambda x: x.get("score", 0.0))
-                    raw_label = str(top_pred.get("label", ""))
-                    score = float(top_pred.get("score", 0.85))
-
-                    return {
-                        "sentiment": self._map_label(raw_label),
-                        "confidence": round(score, 4)
-                    }
-
+            results = self.classifier(text)[0]
+            # Extraction dynamique du score max
+            top_pred = max(results, key=lambda x: x["score"])
+            
+            return {
+                "sentiment": self._map_label(top_pred["label"]),
+                "confidence": round(float(top_pred["score"]), 4) # Dynamique [0.0 - 1.0]
+            }
         except Exception as e:
-            print(f"[Warning Sentiment HF] : {e}")
-
-        # Sécurité : retourne une valeur cohérente si l'API HF met du temps
-        return {"sentiment": "neutre", "confidence": 0.85}
+            print(f"[Erreur Sentiment Local] : {e}")
+            return {"sentiment": "neutre", "confidence": 0.0}

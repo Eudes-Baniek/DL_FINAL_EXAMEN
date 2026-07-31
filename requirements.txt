@@ -1,3 +1,8 @@
+torch
+torchaudio
+transformers
+librosa
+soundfile
 groq
 gradio>=4.0.0
 fastapi>=0.100.0
@@ -6,3 +11,10 @@ python-multipart>=0.0.6
 requests>=2.28.0
 huggingface_hub>=0.20.0
 pydantic>=2.0.0
+pydub
+
+
+
+
+
+

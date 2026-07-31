@@ -1,30 +1,38 @@
 import os
-from groq import Groq
+import torch
+import librosa
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
-# Récupération de la clé Groq stockée dans la variable HF_TOKEN sur Render
-API_KEY = os.getenv("HF_TOKEN")
+MODEL_NAME = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
 
 class ASRModel:
     def __init__(self):
-        if not API_KEY:
-            raise ValueError("La variable d'environnement HF_TOKEN n'est pas définie sur Render.")
-        self.client = Groq(api_key=API_KEY)
+        print(f"Chargement du modèle ASR Wav2Vec 2.0 ({MODEL_NAME})...")
+        self.processor = Wav2Vec2Processor.from_pretrained(MODEL_NAME)
+        self.model = Wav2Vec2ForCTC.from_pretrained(MODEL_NAME)
+        self.model.eval()
 
     def transcribe(self, audio_path: str) -> str:
-        #Transcrit l'audio via Whisper Large v3 chez Groq.
+        """Transcrit l'audio 16kHz via Wav2Vec 2.0."""
         if not audio_path or not os.path.exists(audio_path):
-            raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
+            raise RuntimeError(f"Fichier audio introuvable : {audio_path}")
 
         try:
-            with open(audio_path, "rb") as file:
-                transcription = self.client.audio.transcriptions.create(
-                    file=(os.path.basename(audio_path), file.read()),
-                    model="whisper-large-v3-turbo",
-                    language="fr",
-                    response_format="text"
-                )
-            
-            return transcription.strip() if isinstance(transcription, str) else str(transcription).strip()
+            # 1. Chargement et rééchantillonnage à 16kHz avec librosa
+            speech, sr = librosa.load(audio_path, sr=16000)
+
+            # 2. Prétraitement des valeurs d'entrée
+            input_values = self.processor(speech, sampling_rate=sr, return_tensors="pt").input_values
+
+            # 3. Inférence (sans calcul de gradient)
+            with torch.no_grad():
+                logits = self.model(input_values).logits
+
+            # 4. Décodage des argmax (prédiction des tokens)
+            predicted_ids = torch.argmax(logits, dim=-1)
+            transcription = self.processor.batch_decode(predicted_ids)[0]
+
+            return transcription.strip().lower()
 
         except Exception as e:
-            raise RuntimeError(f"Erreur ASR (Groq Whisper) : {str(e)}")
+            raise RuntimeError(f"Erreur ASR (Wav2Vec 2.0) : {str(e)}")
