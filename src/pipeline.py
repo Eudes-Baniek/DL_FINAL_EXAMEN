@@ -7,14 +7,18 @@ class AudioSentimentPipeline:
         self.sentiment = SentimentModel()
 
     def predict(self, audio_path: str) -> dict:
-        # 1. ASR via API
+        # 1. Transcription ASR
         transcription = self.asr.transcribe(audio_path)
 
-        # 2. Sentiment via API
-        if transcription.strip():
-            sentiment_res = self.sentiment.predict(transcription)
-        else:
-            sentiment_res = {"sentiment": "neutre", "confidence": 0.0}
+        if not transcription:
+            return {
+                "transcription": "",
+                "sentiment": "neutre",
+                "confidence": 0.0
+            }
+
+        # 2. Analyse de sentiment
+        sentiment_res = self.sentiment.predict(transcription)
 
         return {
             "transcription": transcription,

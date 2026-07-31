@@ -1,63 +1,42 @@
 import os
-from huggingface_hub import InferenceClient
+import requests
 
 HF_TOKEN = os.getenv("HF_TOKEN")
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+SENTIMENT_URL = "https://router.huggingface.co/hf-inference/models/cmarkea/distilcamembert-base-sentiment"
 
 class SentimentModel:
-    def __init__(self):
-        self.client = InferenceClient(
-            model="cmarkea/distilcamembert-base-sentiment",
-            token=HF_TOKEN
-        )
-
     def _map_label(self, raw_label: str) -> str:
-        """Mappe les labels bruts du modèle vers : positif, neutre, negatif."""
         label = raw_label.lower().strip()
-        
-        # Cas 1 : Labels type étoiles (1 star -> négatif, 3 stars -> neutre, 5 stars -> positif)
-        if "1 star" in label or "2 star" in label or "LABEL_0" in label:
+        if "1 star" in label or "2 star" in label or "label_0" in label or "neg" in label:
             return "négatif"
-        elif "3 star" in label or "LABEL_1" in label:
+        elif "3 star" in label or "label_1" in label or "neu" in label:
             return "neutre"
-        elif "4 star" in label or "5 star" in label or "LABEL_2" in label:
+        elif "4 star" in label or "5 star" in label or "label_2" in label or "pos" in label:
             return "positif"
-        
-        # Cas 2 : Labels texte explicite (ex: POSITIF, NEGATIF)
-        if "pos" in label:
-            return "positif"
-        elif "neg" in label:
-            return "négatif"
-        
         return "neutre"
 
     def predict(self, text: str) -> dict:
-        """Analyse le sentiment via InferenceClient et retourne positif, neutre ou négatif."""
         if not text or not text.strip():
             return {"sentiment": "neutre", "confidence": 0.0}
 
-        try:
-            response = self.client.text_classification(text)
-            
-            if response and len(response) > 0:
-                # Récupère la prédiction avec le score le plus élevé
-                top_pred = max(
-                    response, 
-                    key=lambda x: x.get("score", 0.0) if isinstance(x, dict) else getattr(x, "score", 0.0)
-                )
-                
-                raw_label = top_pred.get("label") if isinstance(top_pred, dict) else getattr(top_pred, "label", "")
-                score = top_pred.get("score") if isinstance(top_pred, dict) else getattr(top_pred, "score", 0.0)
-                
-                mapped_sentiment = self._map_label(raw_label)
-                
-                return {
-                    "sentiment": mapped_sentiment,
-                    "confidence": float(score)
-                }
+        payload = {"inputs": text}
+        response = requests.post(SENTIMENT_URL, headers=HEADERS, json=payload, timeout=20)
 
-        except Exception as e:
-            # Utile pour déboguer sur les logs Render
-            print(f"[ERREUR SentimentModel API] : {e}")
-            raise RuntimeError(f"Erreur d'analyse du sentiment : {str(e)}")
+        if response.status_code != 200:
+            raise RuntimeError(f"Code {response.status_code} - {response.text}")
+
+        result = response.json()
+        if isinstance(result, list) and len(result) > 0:
+            predictions = result[0] if isinstance(result[0], list) else result
+            top_pred = max(predictions, key=lambda x: x.get("score", 0.0))
+            
+            raw_label = top_pred.get("label", "")
+            score = float(top_pred.get("score", 0.0))
+            
+            return {
+                "sentiment": self._map_label(raw_label),
+                "confidence": score
+            }
 
         return {"sentiment": "neutre", "confidence": 0.0}
