@@ -2,26 +2,30 @@ import os
 import requests
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
-ASR_URL = "https://router.huggingface.co/hf-inference/models/openai/whisper-small"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+SENTIMENT_URL = "https://router.huggingface.co/hf-inference/models/cmarkea/distilcamembert-base-sentiment"
 
-class ASRModel:
-    def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via l'API Inference de Hugging Face (Whisper)."""
-        if not os.path.exists(audio_path):
-            return ""
+class SentimentModel:
+    def predict(self, text: str) -> dict:
+        # Analyse le sentiment d'un texte via l'API Inference de Hugging Face.
+        if not text or not text.strip():
+            return {"sentiment": "neutre", "confidence": 0.0}
 
-        with open(audio_path, "rb") as f:
-            data = f.read()
+        payload = {"inputs": text}
+        try:
+            response = requests.post(SENTIMENT_URL, headers=HEADERS, json=payload, timeout=20)
+            if response.status_code != 200:
+                raise RuntimeError(f"Erreur Sentiment (Code {response.status_code}) : {response.text}")
 
-        response = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
-        
-        if response.status_code != 200:
-            raise RuntimeError(f"Erreur ASR (Code {response.status_code}) : {response.text}")
-
-        result = response.json()
-        if isinstance(result, dict):
-            return result.get("text", "").strip()
-        elif isinstance(result, list) and len(result) > 0:
-            return result[0].get("text", "").strip()
-        return str(result).strip()
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                predictions = result[0] if isinstance(result[0], list) else result
+                top_pred = max(predictions, key=lambda x: x.get("score", 0.0))
+                return {
+                    "sentiment": top_pred.get("label", "neutre"),
+                    "confidence": float(top_pred.get("score", 0.0))
+                }
+        except Exception as e:
+            print(f"Exception lors de l'analyse du sentiment : {e}")
+            
+        return {"sentiment": "neutre", "confidence": 0.0}
