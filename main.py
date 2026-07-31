@@ -1,32 +1,36 @@
-import json
-import sys
+from fastapi import FastAPI, UploadFile, File, HTTPException
+import shutil
+import os
 from src.pipeline import AudioSentimentPipeline
 
-# Chemin du fichier audio à tester
-AUDIO_PATH = r"C:\DL_FINAL_EXAMEN\data\AUD-20260705-WA0003.aac"
+app = FastAPI(
+    title="API de Détection de Sentiment Vocal",
+    description="API REST pour la transcription et l'analyse de sentiment d'appels vocaux",
+    version="1.0"
+)
 
-print("==*10")
-print(" 🎙️ PIPELINE D'ANALYSE DE SENTIMENT VOCALE")
-print("==*10\n")
+pipeline = AudioSentimentPipeline()
 
-try:
-    print("1. Initialisation des modèles ML...")
-    pipeline = AudioSentimentPipeline()
+@app.get("/")
+def root():
+    return {"status": "API en ligne", "endpoint": "/predict"}
 
-    print(f"\n2. Traitement du fichier audio : {AUDIO_PATH}")
-    result = pipeline.predict(AUDIO_PATH)
+@app.post("/predict")
+async def predict_audio(file: UploadFile = File(...)):
+    if not (file.filename.endswith(".wav") or file.filename.endswith(".mp3")):
+        raise HTTPException(status_code=400, detail="Format audio non supporté. Utiliser .wav ou .mp3")
 
-    print("\n==*10")
-    print(" RESULTATS OBTENUS :")
-    print("==*10")
-    print(f"• Transcription ASR : {result['transcription']}")
-    print(f"• Sentiment Prédit : {result['sentiment'].upper()}")
-    print(f"• Score de Confiance : {result['confidence'] * 100:.2f}%")
-    print("==*10")
+    temp_filename = f"temp_{file.filename}"
+    try:
+        with open(temp_filename, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    print("\nFormat JSON de sortie :")
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+        result = pipeline.predict(temp_filename)
+        return result
 
-except Exception as e:
-    print(f"\n❌ Erreur lors de l'exécution du pipeline : {e}")
-    sys.exit(1) 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)

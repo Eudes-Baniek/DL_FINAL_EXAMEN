@@ -11,7 +11,7 @@ class ASRModel:
         self.client = Groq(api_key=API_KEY)
 
     def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via Whisper Large v3 chez Groq."""
+        #Transcrit l'audio via Whisper Large v3 chez Groq.
         if not audio_path or not os.path.exists(audio_path):
             raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
 
