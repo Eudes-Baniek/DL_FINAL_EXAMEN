@@ -1,73 +1,53 @@
 import os
 import time
-from huggingface_hub import InferenceClient
+import requests
 
 HF_TOKEN = os.getenv("HF_TOKEN")
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+
+# Endpoint officiel de l'API Inference Hugging Face pour Whisper
+ASR_URL = "https://api-inference.huggingface.co/models/openai/whisper-small"
 
 class ASRModel:
-    def __init__(self):
-        self.client = InferenceClient(
-            model="openai/whisper-small",
-            token=HF_TOKEN
-        )
-
     def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via l'InferenceClient d'Hugging Face en gérant le flux/générateur."""
+        """Transcrit l'audio via une requête HTTP directe à l'API Inference HF."""
         if not audio_path or not os.path.exists(audio_path):
             raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
 
+        # Lecture binaire du fichier audio
         try:
             with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
+                data = f.read()
         except Exception as e:
             raise RuntimeError(f"Impossible de lire le fichier audio : {str(e)}")
 
         max_retries = 3
-        last_error = ""
-
         for attempt in range(max_retries):
             try:
-                # Appels de reconnaissance vocale via le client HF
-                response = self.client.automatic_speech_recognition(audio_bytes)
+                response = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
                 
-                # 1. Si response est un générateur / iterateur (cause du StopIteration)
-                if hasattr(response, "__iter__") and not isinstance(response, (dict, str, list)):
-                    full_text = []
-                    for chunk in response:
-                        if isinstance(chunk, dict):
-                            full_text.append(chunk.get("text", ""))
-                        elif hasattr(chunk, "text"):
-                            full_text.append(chunk.text)
-                        else:
-                            full_text.append(str(chunk))
-                    return "".join(full_text).strip()
+                # Gestion du modèle en cours de chargement sur HF (Code 503)
+                if response.status_code == 503:
+                    if attempt < max_retries - 1:
+                        time.sleep(10)
+                        continue
 
-                # 2. Si response est un dictionnaire direct {"text": "..."}
-                if isinstance(response, dict):
-                    return response.get("text", "").strip()
+                if response.status_code != 200:
+                    raise RuntimeError(f"Code {response.status_code} - {response.text}")
 
-                # 3. Si response a un attribut .text
-                if hasattr(response, "text"):
-                    return response.text.strip()
+                result = response.json()
 
-                return str(response).strip()
+                # Traitement de la réponse JSON
+                if isinstance(result, dict):
+                    return result.get("text", "").strip()
+                elif isinstance(result, list) and len(result) > 0:
+                    return result[0].get("text", "").strip()
+
+                return str(result).strip()
 
             except Exception as e:
-                # Évite d'attraper le StopIteration pour rien si c'était lié à une mauvaise itération
-                last_error = str(e) if str(e) else repr(e)
-                if "loading" in last_error.lower() and attempt < max_retries - 1:
-                    time.sleep(10)
-                    continue
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"Erreur ASR API : {str(e)}")
+                time.sleep(2)
 
-        raise RuntimeError(f"Erreur ASR (InferenceClient) : {last_error}")
-
-        # Décodage des IDs en texte
-        #le son est découpé en des petites briques qui sont transformés par des logits.
-        #Pour tout caractère de son découpé on lui donne un score et ce score va correspondre à des lettres
-        #ces lettres serviront pour la transcription.
-        #En somme, on passe de l'audio au textes. Ces score (valeurs numériques qui seront utilisées dans les calculs
-        # pour prédire la traduction de l'audio en textes)
-        
-        # transcription = self.processor.batch_decode(predicted_ids)[0]
-        
-        # return transcription.strip()
+        return ""
