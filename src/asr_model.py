@@ -6,21 +6,31 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 class ASRModel:
     def __init__(self):
+        # Utilisation de l'API d'Inference HF
         self.client = InferenceClient(
             model="openai/whisper-small",
             token=HF_TOKEN
         )
 
     def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via le client Inference officiel Hugging Face."""
+        """Transcrit l'audio via l'InferenceClient d'Hugging Face."""
         if not audio_path or not os.path.exists(audio_path):
-            return ""
+            raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
 
-        # Tentatives avec gestion du démarrage à chaud du modèle HF
+        # Lecture du fichier audio en binaire pour transmission directe
+        try:
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+        except Exception as e:
+            raise RuntimeError(f"Impossible de lire le fichier audio : {str(e)}")
+
         max_retries = 3
+        last_error = ""
+
         for attempt in range(max_retries):
             try:
-                result = self.client.automatic_speech_recognition(audio_path)
+                # Passage des octets bruts directement à la méthode
+                result = self.client.automatic_speech_recognition(audio_bytes)
                 
                 if isinstance(result, dict):
                     return result.get("text", "").strip()
@@ -29,12 +39,13 @@ class ASRModel:
                 return str(result).strip()
 
             except Exception as e:
-                err_msg = str(e)
-                # Si le modèle est en train de charger sur les serveurs HF
-                if "loading" in err_msg.lower() and attempt < max_retries - 1:
+                last_error = str(e) if str(e) else repr(e)
+                # Si le modèle est en cours de chargement sur HF
+                if "loading" in last_error.lower() and attempt < max_retries - 1:
                     time.sleep(10)
                     continue
-                raise RuntimeError(f"Erreur ASR (InferenceClient) : {err_msg}")
+
+        raise RuntimeError(f"Erreur ASR (InferenceClient) : {last_error}")
 
         # Décodage des IDs en texte
         #le son est découpé en des petites briques qui sont transformés par des logits.
