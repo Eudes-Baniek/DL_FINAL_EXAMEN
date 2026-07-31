@@ -3,7 +3,8 @@ import requests
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-ASR_URL = "https://router.huggingface.co/hf-inference/models/openai/whisper-small"
+# ASR_URL = "https://router.huggingface.co/hf-inference/models/openai/whisper-small"
+ASR_URL = "https://api-inference.huggingface.co/models/openai/whisper-small"
 
 class ASRModel:
     def transcribe(self, audio_path: str) -> str:
