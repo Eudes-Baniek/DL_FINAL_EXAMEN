@@ -43,4 +43,8 @@ demo = gr.Interface(
 )
 
 if __name__ == "__main__":
-    demo.launch()
+# Render injecte la variable PORT dynamiquement
+    port = int(os.environ.get("PORT", 7860))
+    
+    # server_name="0.0.0.0" est INDISPENSABLE pour les conteneurs/Render
+    demo.launch(server_name="0.0.0.0", server_port=port)
