@@ -29,7 +29,7 @@ demo = gr.Interface(
         label="Déposez votre fichier audio (.wav, .mp3, .aac)",
     ),
     outputs=[
-        gr.Textbox(label="1. Transcription ASR (Wav2Vec 2.0)", lines=4),
+        gr.Textbox(label="1. Transcription ASR (Whisper)", lines=4),
         gr.Textbox(
             label="2. Sentiment prédit (CamemBERT / RoBERTa)", lines=1
         ),

@@ -1,48 +1,27 @@
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import os
+import requests
 
+HF_TOKEN = os.getenv("HF_TOKEN")
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
+ASR_URL = "https://router.huggingface.co/hf-inference/models/openai/whisper-small"
 
-class SentimentModel:
+class ASRModel:
+    def transcribe(self, audio_path: str) -> str:
+        """Transcrit l'audio via l'API Inference de Hugging Face (Whisper)."""
+        if not os.path.exists(audio_path):
+            return ""
 
-    def __init__(
-        self,
-        model_name: str = "tblard/tf-allocine-camembert",
-    ):  # ou un modèle 3 classes
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        # Utilisation d'un pipeline Hugging Face d'analyse de sentiment en français
-        from transformers import pipeline
+        with open(audio_path, "rb") as f:
+            data = f.read()
 
-        self.pipe = pipeline(
-            "text-classification",
-            model="cmarkea/distilcamembert-base-sentiment",
-            device=0 if self.device == "cuda" else -1,
-        )
-
-        # Mapping des labels si nécessaire
-        self.label_mapping = {
-            "LABEL_0": "négatif",
-            "LABEL_1": "neutre",
-            "LABEL_2": "positif",
-            "POSITIVE": "positif",
-            "NEGATIVE": "négatif",
-            "NEUTRAL": "neutre",
-            "1 star": "négatif",
-            "2 stars": "négatif",
-            "3 stars": "neutre",
-            "4 stars": "positif",
-            "5 stars": "positif",
-        }
-
-    def predict(self, text: str):
-        #Analyse le sentiment d'un texte et renvoie le sentiment + score.
+        response = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
         
-        if not text.strip():
-            return {"sentiment": "neutre", "confidence": 0.0}
+        if response.status_code != 200:
+            raise RuntimeError(f"Erreur ASR (Code {response.status_code}) : {response.text}")
 
-        result = self.pipe(text)[0]
-        raw_label = result["label"]
-        score = round(float(result["score"]), 4)
-
-        sentiment = self.label_mapping.get(raw_label, raw_label.lower())
-
-        return {"sentiment": sentiment, "confidence": score}
+        result = response.json()
+        if isinstance(result, dict):
+            return result.get("text", "").strip()
+        elif isinstance(result, list) and len(result) > 0:
+            return result[0].get("text", "").strip()
+        return str(result).strip()
