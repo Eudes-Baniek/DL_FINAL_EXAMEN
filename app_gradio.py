@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 from src.pipeline import AudioSentimentPipeline
 
