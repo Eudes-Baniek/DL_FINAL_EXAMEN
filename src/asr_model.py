@@ -1,51 +1,30 @@
 import os
-import time
-import requests
+from groq import Groq
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-
-# Modèle ASR Français pleinement compatible avec l'API Serverless HF
-ASR_URL = "https://router.huggingface.co/hf-inference/models/jonatasgrosman/wav2vec2-large-xlsr-53-french"
+# Récupération de la clé Groq stockée dans la variable HF_TOKEN sur Render
+API_KEY = os.getenv("HF_TOKEN")
 
 class ASRModel:
+    def __init__(self):
+        if not API_KEY:
+            raise ValueError("La variable d'environnement HF_TOKEN n'est pas définie sur Render.")
+        self.client = Groq(api_key=API_KEY)
+
     def transcribe(self, audio_path: str) -> str:
-        """Transcrit l'audio via l'API Inference Serverless HF."""
+        """Transcrit l'audio via Whisper Large v3 chez Groq."""
         if not audio_path or not os.path.exists(audio_path):
             raise RuntimeError("Fichier audio introuvable ou chemin invalide.")
 
         try:
-            with open(audio_path, "rb") as f:
-                data = f.read()
+            with open(audio_path, "rb") as file:
+                transcription = self.client.audio.transcriptions.create(
+                    file=(os.path.basename(audio_path), file.read()),
+                    model="whisper-large-v3-turbo",
+                    language="fr",
+                    response_format="text"
+                )
+            
+            return transcription.strip() if isinstance(transcription, str) else str(transcription).strip()
+
         except Exception as e:
-            raise RuntimeError(f"Impossible de lire le fichier audio : {str(e)}")
-
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = requests.post(ASR_URL, headers=HEADERS, data=data, timeout=30)
-                
-                # Gestion du modèle en cours de réveil (503)
-                if response.status_code == 503:
-                    if attempt < max_retries - 1:
-                        time.sleep(10)
-                        continue
-
-                if response.status_code != 200:
-                    raise RuntimeError(f"Code {response.status_code} - {response.text}")
-
-                result = response.json()
-
-                if isinstance(result, dict):
-                    return result.get("text", "").strip()
-                elif isinstance(result, list) and len(result) > 0:
-                    return result[0].get("text", "").strip()
-
-                return str(result).strip()
-
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise RuntimeError(f"Erreur ASR API : {str(e)}")
-                time.sleep(2)
-
-        return ""
+            raise RuntimeError(f"Erreur ASR (Groq Whisper) : {str(e)}")
